@@ -3,41 +3,75 @@ module Counter where
 import Html exposing (..)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
-
+import Task
+import Effects exposing (Effects)
+import Json.Encode as Encode
+import Debug
+import ElmFire exposing (Location)
+import Cache
 
 -- MODEL
 
-type alias Model = Int
-
+type alias Model =
+  Cache.Entry Int
 
 -- UPDATE
 
-type Action = Increment | Decrement
+type Action =
+  Nop |
+  Increment |
+  Decrement
 
-update : Action -> Model -> Model
-update action model =
-  case action of
-    Increment -> model + 1
-    Decrement -> model - 1
+update : String -> Action -> Model -> (Model, Effects Action)
+update url action model =
+  let result =
+        case action of
+          Nop ->
+            (model, Effects.none)
+          Increment ->
+            (model, effects 1)
+          Decrement ->
+            (model, effects -1)
+      effects delta =
+        (url
+        |> ElmFire.fromUrl
+        |> ElmFire.set (currentValue + delta |> Encode.int)
+        |> Task.mapError (Debug.log "ElmFire.set failed")
+        |> Task.map (always Nop))
+        `Task.onError` (always (Nop |> Task.succeed))
+        |> Effects.task
+      currentValue =
+        case model of
+          Cache.Success value ->
+            value
+          _ ->
+            0
+  in result
 
 
 -- VIEW
 
-view : Signal.Address Action -> Model -> Html
-view address model =
-  div []
-    [ button [ onClick address Decrement ] [ text "-" ]
-    , div [ countStyle ] [ text (toString model) ]
-    , button [ onClick address Increment ] [ text "+" ]
-    ]
+view : String -> Signal.Address Action -> Model -> Html
+view url address model =
+  case model of
+    Cache.Loading ->
+      "Loading " ++ url ++ "..." |> text
+    Cache.SubscriptionFailed message ->
+      "Can't subscribe to " ++ url |> text
+    Cache.DecodingFailed message ->
+      "Bad data at " ++ url ++ ": " ++ message |> text
+    Cache.Success value ->
+      div []
+        [ button [ onClick address Decrement ] [ text "-" ]
+        , div [ countStyle ] [ value |> toString |> text ]
+        , button [ onClick address Increment ] [ text "+" ]
+        ]
 
 
 countStyle : Attribute
 countStyle =
   style
     [ ("font-size", "20px")
-    , ("font-family", "monospace")
     , ("display", "inline-block")
-    , ("width", "50px")
     , ("text-align", "center")
     ]
