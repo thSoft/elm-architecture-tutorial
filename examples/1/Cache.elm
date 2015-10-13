@@ -56,13 +56,13 @@ update decoder action model =
     SubscriptionError error ->
       (SubscriptionFailed error, Effects.none)
     ValueChanged value ->
-      let model =
+      let updatedModel =
             case value |> Decode.decodeValue decoder of
               Ok data ->
                 Success data
               Err message ->
                 DecodingFailed message
-      in (model, Effects.none)
+      in (updatedModel, Effects.none)
 
 inputs : List (Signal Action)
 inputs =
