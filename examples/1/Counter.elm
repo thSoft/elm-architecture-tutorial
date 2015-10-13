@@ -13,7 +13,7 @@ import Cache
 -- MODEL
 
 type alias Model =
-  Cache.Entry Int
+  Cache.Model Int
 
 -- UPDATE
 

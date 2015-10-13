@@ -7,7 +7,7 @@ import Html exposing (Html)
 import Effects exposing (Effects, Never)
 import StartApp exposing (App)
 import ElmFire exposing (Location)
-import Cache exposing (Cache)
+import Cache
 import Counter
 
 app : App Counter.Model
@@ -23,12 +23,6 @@ type Action =
   CounterAction Counter.Action |
   CacheAction Cache.Action
 
-counterCache : Cache Int
-counterCache =
-  Cache.cache
-    Decode.int
-    url
-
 url : String
 url =
   "https://thsoft.firebaseio.com/example"
@@ -36,7 +30,7 @@ url =
 init : (Counter.Model, Effects Action)
 init =
   let (model, cacheEffects) =
-        counterCache.init
+        Cache.init url
       effects =
         cacheEffects |> Effects.map CacheAction
   in (model, effects)
@@ -52,7 +46,7 @@ update action model =
       in (updatedModel, effects)
     CacheAction cacheAction ->
       let (updatedModel, cacheEffects) =
-            counterCache.update cacheAction model
+            Cache.update Decode.int cacheAction model
           effects =
             cacheEffects |> Effects.map CacheAction
       in (updatedModel, effects)
@@ -66,7 +60,7 @@ view address model =
 
 inputs : List (Signal Action)
 inputs =
-  counterCache.inputs |> List.map (\signal ->
+  Cache.inputs |> List.map (\signal ->
     signal |> Signal.map CacheAction
   )
 
