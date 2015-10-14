@@ -3,11 +3,8 @@ module Cache where
 import Dict exposing (Dict)
 import Signal exposing (Mailbox, Address)
 import Json.Decode as Decode exposing (Value, Decoder)
-import Json.Encode as Encode
-import Html exposing (Html)
 import Task exposing (Task)
 import Effects exposing (Effects)
-import StartApp
 import ElmFire exposing (..)
 
 type alias Cache a =
