@@ -12,8 +12,8 @@ type alias Cache a =
 
 type Entry a =
   NotSubscribed |
-  Loading |
   SubscriptionFailed ElmFire.Error |
+  Loading |
   DecodingFailed String |
   Success a
 
@@ -71,14 +71,12 @@ update decoder action model =
       (model, Effects.none)
     SubscriptionError url error ->
       let updatedCache =
-            model |> Dict.update url (\_ ->
-              Just <| SubscriptionFailed error
-            )
+            model |> Dict.insert url (SubscriptionFailed error)
       in (updatedCache, Effects.none)
     ValueChanged url value ->
       let updatedCache =
-            model |> Dict.update url (\_ ->
-              Just <| case value |> Decode.decodeValue decoder of
+            model |> Dict.insert url (
+              case value |> Decode.decodeValue decoder of
                 Ok data ->
                   Success data
                 Err message ->

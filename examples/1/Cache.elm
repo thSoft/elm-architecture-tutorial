@@ -7,8 +7,8 @@ import Effects exposing (Effects)
 import ElmFire exposing (..)
 
 type Model a =
-  Loading |
   SubscriptionFailed ElmFire.Error |
+  Loading |
   DecodingFailed String |
   Success a
 
