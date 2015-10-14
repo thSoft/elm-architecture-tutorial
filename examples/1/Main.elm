@@ -25,7 +25,7 @@ type Action =
 
 url : String
 url =
-  "https://thsoft.firebaseio.com/example"
+  "https://thsoft.firebaseio.com/elm-architecture-tutorial/1"
 
 init : (Counter.Model, Effects Action)
 init =
