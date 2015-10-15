@@ -1,11 +1,11 @@
 module Cache where
 
 import Dict exposing (Dict)
-import Signal exposing (Mailbox, Address)
+import Signal exposing (Mailbox)
 import Json.Decode as Decode exposing (Value, Decoder)
 import Task exposing (Task)
 import Effects exposing (Effects)
-import ElmFire exposing (..)
+import ElmFire exposing (Location, Subscription)
 
 type alias Cache a =
   Dict String (Entry a)
@@ -24,10 +24,6 @@ get url cache =
 init : Cache a
 init =
   Dict.empty
-
-dummyTask : a -> Task x ()
-dummyTask _ =
-  Task.succeed ()
 
 type Action =
   Event Event |
@@ -91,13 +87,13 @@ update decoder action model =
       let effects =
             case request of
               Subscribe url ->
-                (subscribe
+                (ElmFire.subscribe
                   (\snapshot ->
                     ValueChanged url snapshot.subscription snapshot.value |> Signal.send eventMailbox.address
                   )
-                  dummyTask
-                  (valueChanged noOrder)
-                  (url |> fromUrl)
+                  (always <| Task.succeed ())
+                  (ElmFire.valueChanged ElmFire.noOrder)
+                  (url |> ElmFire.fromUrl)
                 |> Task.map (\subscription ->
                   Event <| Subscribed url subscription
                 ))
@@ -118,7 +114,7 @@ update decoder action model =
                   Success subscription _ ->
                     unsubscribeEffects subscription url
           unsubscribeEffects subscription url =
-            (unsubscribe subscription
+            (ElmFire.unsubscribe subscription
             |> Task.map (\_ ->
               Event <| Unsubscribed url
             ))

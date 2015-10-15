@@ -11,6 +11,7 @@ import StartApp exposing (App)
 import Debug
 import ElmFire exposing (Location)
 import Cache exposing (Cache)
+import RemoteList
 import Counter
 
 main : Signal Html
@@ -34,35 +35,27 @@ app =
 type alias Model =
   {
     cache: Cache Counter.Model,
-    urls: List String
+    remoteList: RemoteList.Model
   }
 
 init : (Model, Effects Action)
 init =
-  let model =
+  let result =
+        (model, effects)
+      model =
         {
-          cache = cache,
-          urls = []
+          cache =
+            cacheModel,
+          remoteList =
+            remoteListModel
         }
-      cache =
-        Cache.init
-      subscribe action query =
-        (ElmFire.subscribe
-          (\snapshot ->
-            snapshot.reference |> ElmFire.toUrl |> action |> Signal.send actionMailbox.address
-          )
-          Cache.dummyTask
-          (query ElmFire.noOrder)
-          (rootUrl |> ElmFire.fromUrl)
-        |> Task.map (always NoAction))
-        `Task.onError` (always (NoAction |> Task.succeed))
-        |> Effects.task
       effects =
-        Effects.batch [
-          subscribe Created ElmFire.childAdded,
-          subscribe Removed ElmFire.childRemoved
-        ]
-  in (model, effects)
+        remoteListEffects |> Effects.map RemoteListAction
+      cacheModel =
+        Cache.init
+      (remoteListModel, remoteListEffects) =
+        RemoteList.init rootUrl
+  in result
 
 rootUrl : String
 rootUrl =
@@ -71,11 +64,10 @@ rootUrl =
 type Action =
   NoAction |
   Create |
-  Created String |
   Remove String |
-  Removed String |
   CounterAction String Counter.Action |
-  CacheAction Cache.Action
+  CacheAction Cache.Action |
+  RemoteListAction RemoteList.Action
 
 update : Action -> Model -> (Model, Effects Action)
 update action model =
@@ -91,12 +83,6 @@ update action model =
             `Task.onError` (always (NoAction |> Task.succeed))
             |> Effects.task
       in (model, effects)
-    Created url ->
-      let updatedModel =
-            { model | urls <- model.urls ++ [url] }
-          effects =
-            url |> Cache.Subscribe |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
-      in (updatedModel, effects)
     Remove url ->
       let effects =
             (url
@@ -107,10 +93,6 @@ update action model =
             `Task.onError` (always (NoAction |> Task.succeed))
             |> Effects.task
       in (model, effects)
-    Removed url ->
-      let updatedModel =
-            { model | urls <- model.urls |> remove url }
-      in (updatedModel, Effects.none)
     CounterAction url counterAction ->
       let counterEffects =
             Counter.update url counterAction (model.cache |> Cache.get url)
@@ -125,14 +107,24 @@ update action model =
           effects =
             cacheEffects |> Effects.map CacheAction
       in (updatedModel, effects)
+    RemoteListAction remoteListAction ->
+      let updatedModel =
+            { model | remoteList <- updatedRemoteList }
+          updatedRemoteList =
+            RemoteList.update remoteListAction model.remoteList
+          effects =
+            case remoteListAction of
+              RemoteList.Created url ->
+                url |> Cache.Subscribe |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
+              RemoteList.Removed url ->
+                url |> Cache.Unsubscribe |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
+              _ ->
+                Effects.none
+      in (updatedModel, effects)
 
 pushLocation : Location
 pushLocation =
   rootUrl |> ElmFire.fromUrl |> ElmFire.push
-
-remove : a -> List a -> List a
-remove element list =
-  list |> List.filter (\elem -> elem /= element)
 
 view : Address Action -> Model -> Html
 view address model =
@@ -141,7 +133,7 @@ view address model =
       insert =
         button [ onClick address Create ] [ text "Add" ]
       counterViews =
-        model.urls |> List.sort |> List.map (\url ->
+        model.remoteList |> List.sort |> List.map (\url ->
           Counter.view
             {
               url = url,
@@ -154,16 +146,7 @@ view address model =
 
 inputs : List (Signal Action)
 inputs =
-  let result =
-        fromMailbox :: fromCache
-      fromCache =
-        Cache.inputs |> List.map (\signal ->
-          signal |> Signal.map CacheAction
-        )
-      fromMailbox =
-        actionMailbox.signal
-  in result
-
-actionMailbox : Mailbox Action
-actionMailbox =
-  Signal.mailbox NoAction
+  [
+    Cache.inputs |> List.map (Signal.map CacheAction),
+    RemoteList.inputs |> List.map (Signal.map RemoteListAction)
+  ] |> List.concat
