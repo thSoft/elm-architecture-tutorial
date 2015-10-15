@@ -76,7 +76,9 @@ update action model =
       (model, Effects.none)
     Create ->
       let effects =
-            (pushLocation
+            (rootUrl
+            |> ElmFire.fromUrl
+            |> ElmFire.push
             |> ElmFire.set (Encode.int 0)
             |> Task.mapError (Debug.log "ElmFire.set failed")
             |> Task.map (always NoAction))
@@ -115,16 +117,14 @@ update action model =
           effects =
             case remoteListAction of
               RemoteList.Created url ->
-                url |> Cache.Subscribe |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
+                url |> performCacheRequest Cache.Subscribe
               RemoteList.Removed url ->
-                url |> Cache.Unsubscribe |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
+                url |> performCacheRequest Cache.Unsubscribe
               _ ->
                 Effects.none
+          performCacheRequest request url =
+            url |> request |> Cache.Request |> CacheAction |> Task.succeed |> Effects.task
       in (updatedModel, effects)
-
-pushLocation : Location
-pushLocation =
-  rootUrl |> ElmFire.fromUrl |> ElmFire.push
 
 view : Address Action -> Model -> Html
 view address model =
